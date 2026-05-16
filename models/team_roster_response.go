@@ -77,10 +77,10 @@ type Tab struct {
 
 // MiscData contains miscellaneous roster data
 type MiscData struct {
-	MaxActions            int      `json:"maxActions"`
-	IllegalRosterMsgsTitle string  `json:"illegalRosterMsgsTitle,omitempty"`
+	MaxActions             int      `json:"maxActions"`
+	IllegalRosterMsgsTitle string   `json:"illegalRosterMsgsTitle,omitempty"`
 	IllegalRosterMsgsText  []string `json:"illegalRosterMsgsText,omitempty"`
-	SalaryInfo struct {
+	SalaryInfo             struct {
 		Title string `json:"title"`
 		Info  []struct {
 			TradeName string `json:"tradeName"`
@@ -157,28 +157,28 @@ type Player struct {
 // Icon TypeID constants
 const (
 	// Injury icons
-	IconDayToDay         = "1"  // Day-to-Day injury (tooltip: "<body part> - Day-to-Day")
-	IconInjuredList      = "2"  // Injured List (tooltip: "Injured List - 15-day IL - <body part>" or "60-day IL")
-	IconOutIndefinitely  = "30" // Out indefinitely (tooltip: "<body part> - Out Indefinitely")
+	IconDayToDay        = "1"  // Day-to-Day injury (tooltip: "<body part> - Day-to-Day")
+	IconInjuredList     = "2"  // Injured List (tooltip: "Injured List - 15-day IL - <body part>" or "60-day IL")
+	IconOutIndefinitely = "30" // Out indefinitely (tooltip: "<body part> - Out Indefinitely")
 
 	// Player status icons
-	IconFreeAgent        = "3"  // Free agent (not signed to an MLB team)
-	IconMinorLeagues     = "4"  // Currently in the minor leagues
-	IconSuspended        = "6"  // Suspended
-	IconInactive         = "7"  // Inactive or retired
+	IconFreeAgent    = "3" // Free agent (not signed to an MLB team)
+	IconMinorLeagues = "4" // Currently in the minor leagues
+	IconSuspended    = "6" // Suspended
+	IconInactive     = "7" // Inactive or retired
 
 	// News icons (ordered by recency)
-	IconNewsOld          = "8"  // Older news
-	IconNewsRecent       = "9"  // Recent news
-	IconNewsBreaking     = "14" // Breaking / today's news
+	IconNewsOld      = "8"  // Older news
+	IconNewsRecent   = "9"  // Recent news
+	IconNewsBreaking = "14" // Breaking / today's news
 
 	// Handedness icons
-	IconBatsLeft         = "16" // Bats left or left-handed pitcher
-	IconBatsRight        = "17" // Bats right or right-handed pitcher
-	IconSwitchHitter     = "18" // Switch hitter
+	IconBatsLeft     = "16" // Bats left or left-handed pitcher
+	IconBatsRight    = "17" // Bats right or right-handed pitcher
+	IconSwitchHitter = "18" // Switch hitter
 
 	// Eligibility icons
-	IconMinorsEligible   = "31" // Eligible for minors roster slot
+	IconMinorsEligible = "31" // Eligible for minors roster slot
 )
 
 // PlayerIcon represents an icon shown for a player
@@ -253,7 +253,8 @@ type StatusTotal struct {
 	Total    int    `json:"total"`
 }
 
-// FantasyTeam represents a team in the fantasy league
+// FantasyTeam represents a team in the fantasy league.
+// IsTeam/IsMyTeam are populated in matchup/scoreboard contexts.
 type FantasyTeam struct {
 	LogoURL256   string `json:"logoUrl256"`
 	Name         string `json:"name"`
@@ -262,4 +263,6 @@ type FantasyTeam struct {
 	ShortName    string `json:"shortName"`
 	Commissioner bool   `json:"commissioner"`
 	LogoID       string `json:"logoId"`
+	IsTeam       bool   `json:"isTeam,omitempty"`
+	IsMyTeam     bool   `json:"isMyTeam,omitempty"`
 }

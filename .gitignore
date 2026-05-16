@@ -4,4 +4,6 @@ fantrax-cache/
 .idea/
 .vscode/
 *.json
+# Test fixtures live in testdata/ — always commit them.
+!**/testdata/*.json
 roster_edits.md
