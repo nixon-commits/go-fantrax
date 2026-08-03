@@ -37,7 +37,24 @@ type Client struct {
 // fantraxAPIVersion is the client version sent in every /fxpa/req payload.
 // Fantrax validates this server-side and returns STALE_CLIENT (empty responses)
 // when it is outdated. Update here when Fantrax deploys a new version.
-const fantraxAPIVersion = "181.0.0"
+//
+// Find the current value in the Fantrax web app's embedded package.json, which
+// ships inside a lazily-loaded Angular chunk:
+//
+//	curl -s https://www.fantrax.com/ | grep -oE 'src="main-[A-Z0-9]+\.js"'
+//	curl -s https://www.fantrax.com/main-<HASH>.js | grep -oE 'chunk-[A-Z0-9]+\.js' | sort -u
+//	# fetch the chunks, then:
+//	grep -ohE '\{name:"fantrax",version:"[0-9.]+"' chunk-*.js
+//
+// Confirm before shipping — the gate is checked ahead of auth, so an
+// unauthenticated probe distinguishes the two cases cleanly:
+//
+//	curl -s -X POST https://www.fantrax.com/fxpa/req -H 'Content-Type: application/json' \
+//	  --data-raw '{"msgs":[{"method":"getUserInfo","data":{}}],"uiv":3,"refUrl":"https://www.fantrax.com/","dt":0,"at":0,"av":"0.0","tz":"UTC","v":"<CANDIDATE>"}'
+//
+// A stale version returns pageError.code STALE_CLIENT; a current one returns
+// WARNING_NOT_LOGGED_IN (which means the version passed).
+const fantraxAPIVersion = "185.1.0"
 
 // buildFullRequest wraps a msgs slice in the standard Fantrax /fxpa/req envelope.
 // All calls to /fxpa/req must use this wrapper — omitting "v" or using a stale
