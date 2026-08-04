@@ -116,7 +116,7 @@ func (c *Client) getPlayerPoolPage(statusFilter string, pageNumber int) (*models
 		"at":     0,
 		"av":     "0.0",
 		"tz":     c.getTimezone(),
-		"v":      fantraxAPIVersion,
+		"v":      APIVersion,
 	}
 
 	jsonStr, err := json.Marshal(fullRequest)
@@ -139,7 +139,7 @@ func (c *Client) getPlayerPoolPage(statusFilter string, pageNumber int) (*models
 		return nil, fmt.Errorf("API returned non-200 status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

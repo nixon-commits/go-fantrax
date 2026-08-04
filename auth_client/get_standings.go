@@ -405,7 +405,7 @@ func (c *Client) GetStandings(opts ...StandingsOption) (*LeagueStandings, error)
 		opt(options)
 	}
 
-	fullRequest := buildFullRequest(
+	fullRequest := BuildFullRequest(
 		[]FantraxMessage{{
 			Method: "getStandings",
 			Data:   map[string]string{"leagueId": c.LeagueID, "view": string(options.view)},
@@ -434,7 +434,7 @@ func (c *Client) GetStandings(opts ...StandingsOption) (*LeagueStandings, error)
 		return nil, fmt.Errorf("API returned non-200 status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

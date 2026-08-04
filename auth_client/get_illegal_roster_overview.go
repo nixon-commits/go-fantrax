@@ -48,7 +48,7 @@ func (c *Client) fetchIllegalRosterHTML() (string, error) {
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}

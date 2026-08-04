@@ -16,7 +16,7 @@ func makeResp(body string) *http.Response {
 
 func TestReadBody_PageError_ReturnsError(t *testing.T) {
 	resp := makeResp(`{"pageError":{"code":"STALE_CLIENT","title":"App Update Required","text":"Your browser is using an outdated cached version."}}`)
-	_, err := readBody(resp)
+	_, err := ReadBody(resp)
 	if err == nil {
 		t.Fatal("expected error for STALE_CLIENT response, got nil")
 	}
@@ -28,7 +28,7 @@ func TestReadBody_PageError_ReturnsError(t *testing.T) {
 func TestReadBody_ValidResponse_ReturnsBody(t *testing.T) {
 	payload := `{"data":{},"roles":[],"responses":[{"data":{"userInfo":{}}}]}`
 	resp := makeResp(payload)
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestReadBody_ValidResponse_ReturnsBody(t *testing.T) {
 func TestReadBody_EmptyPageError_DoesNotError(t *testing.T) {
 	// pageError present but code is empty — not a real error, don't reject it.
 	resp := makeResp(`{"pageError":{"code":"","text":""},"responses":[]}`)
-	_, err := readBody(resp)
+	_, err := ReadBody(resp)
 	if err != nil {
 		t.Errorf("empty pageError code should not error, got: %v", err)
 	}
@@ -48,16 +48,16 @@ func TestReadBody_EmptyPageError_DoesNotError(t *testing.T) {
 
 func TestReadBody_NoPageError_DoesNotError(t *testing.T) {
 	resp := makeResp(`{"responses":[]}`)
-	_, err := readBody(resp)
+	_, err := ReadBody(resp)
 	if err != nil {
 		t.Errorf("response without pageError should not error, got: %v", err)
 	}
 }
 
 func TestReadBody_UnparsableJSON_ReturnsBodyNotError(t *testing.T) {
-	// Some /fxa/ endpoints return non-JSON; readBody should not error on those.
+	// Some /fxa/ endpoints return non-JSON; ReadBody should not error on those.
 	resp := makeResp(`not json at all`)
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		t.Errorf("unparseable body should pass through, got err: %v", err)
 	}

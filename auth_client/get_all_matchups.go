@@ -17,7 +17,7 @@ type AllMatchupsResult struct {
 
 // GetAllMatchups returns all matchups for the season using the SCHEDULE view
 func (c *Client) GetAllMatchups() (*AllMatchupsResult, error) {
-	fullRequest := buildFullRequest(
+	fullRequest := BuildFullRequest(
 		[]FantraxMessage{{
 			Method: "getStandings",
 			Data:   map[string]string{"leagueId": c.LeagueID, "view": "SCHEDULE"},
@@ -45,7 +45,7 @@ func (c *Client) GetAllMatchups() (*AllMatchupsResult, error) {
 		return nil, fmt.Errorf("API returned non-200 status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

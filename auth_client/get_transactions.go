@@ -40,7 +40,7 @@ func (c *Client) GetTransactionDetailsHistoryRaw(maxResultsPerPage string) (json
 		"at":     0,
 		"av":     "0.0",
 		"tz":     "UTC",
-		"v":      fantraxAPIVersion,
+		"v":      APIVersion,
 	}
 
 	jsonStr, err := json.Marshal(fullRequest)
@@ -64,7 +64,7 @@ func (c *Client) GetTransactionDetailsHistoryRaw(maxResultsPerPage string) (json
 		return nil, fmt.Errorf("API returned non-200 status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -192,7 +192,7 @@ func (c *Client) GetTransactionDetailsHistoryFullRaw(req GetTransactionDetailsHi
 		"at":     0,
 		"av":     "0.0",
 		"tz":     "UTC",
-		"v":      fantraxAPIVersion,
+		"v":      APIVersion,
 	}
 
 	jsonStr, err := json.Marshal(fullRequest)
@@ -216,7 +216,7 @@ func (c *Client) GetTransactionDetailsHistoryFullRaw(req GetTransactionDetailsHi
 		return nil, fmt.Errorf("API returned non-200 status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

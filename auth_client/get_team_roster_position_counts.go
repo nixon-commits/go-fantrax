@@ -129,7 +129,7 @@ func (c *Client) GetTeamRosterPositionCounts(teamID, scoringPeriod string) (*Gam
 		data["scoringPeriod"] = scoringPeriod
 	}
 
-	fullRequest := buildFullRequest(
+	fullRequest := BuildFullRequest(
 		[]FantraxMessage{{Method: "getTeamRosterInfo", Data: data}},
 		fmt.Sprintf("https://www.fantrax.com/fantasy/league/%s/team/roster", c.LeagueID),
 	)
@@ -154,7 +154,7 @@ func (c *Client) GetTeamRosterPositionCounts(teamID, scoringPeriod string) (*Gam
 		return nil, fmt.Errorf("API returned non-200 status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

@@ -216,7 +216,7 @@ type MatchupGame struct {
 
 // GetLeagueHomeInfoRaw fetches the raw league home info response
 func (c *Client) GetLeagueHomeInfoRaw() ([]byte, error) {
-	fullRequest := buildFullRequest(
+	fullRequest := BuildFullRequest(
 		[]FantraxMessage{{Method: "getLeagueHomeInfo", Data: map[string]interface{}{}}},
 		fmt.Sprintf("https://www.fantrax.com/fantasy/league/%s/home", c.LeagueID),
 	)
@@ -241,7 +241,7 @@ func (c *Client) GetLeagueHomeInfoRaw() ([]byte, error) {
 		return nil, fmt.Errorf("API returned non-200 status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

@@ -34,7 +34,7 @@ type Client struct {
 	UserInfo *models.UserInfo
 }
 
-// fantraxAPIVersion is the client version sent in every /fxpa/req payload.
+// APIVersion is the client version sent in every /fxpa/req payload.
 // Fantrax validates this server-side and returns STALE_CLIENT (empty responses)
 // when it is outdated. Update here when Fantrax deploys a new version.
 //
@@ -54,12 +54,12 @@ type Client struct {
 //
 // A stale version returns pageError.code STALE_CLIENT; a current one returns
 // WARNING_NOT_LOGGED_IN (which means the version passed).
-const fantraxAPIVersion = "185.1.0"
+const APIVersion = "185.1.0"
 
-// buildFullRequest wraps a msgs slice in the standard Fantrax /fxpa/req envelope.
+// BuildFullRequest wraps a msgs slice in the standard Fantrax /fxpa/req envelope.
 // All calls to /fxpa/req must use this wrapper — omitting "v" or using a stale
 // value triggers STALE_CLIENT responses with an empty responses array.
-func buildFullRequest(msgs []FantraxMessage, refUrl string) map[string]interface{} {
+func BuildFullRequest(msgs []FantraxMessage, refUrl string) map[string]interface{} {
 	return map[string]interface{}{
 		"msgs":   msgs,
 		"uiv":    3,
@@ -68,7 +68,7 @@ func buildFullRequest(msgs []FantraxMessage, refUrl string) map[string]interface
 		"at":     0,
 		"av":     "0.0",
 		"tz":     "UTC",
-		"v":      fantraxAPIVersion,
+		"v":      APIVersion,
 	}
 }
 
@@ -81,11 +81,15 @@ type fantraxPageError struct {
 	Text  string `json:"text"`
 }
 
-// readBody reads resp.Body and checks for an embedded Fantrax pageError before
+// ReadBody reads resp.Body and checks for an embedded Fantrax pageError before
 // returning the bytes. Any method calling /fxpa/req should use this instead of
 // io.ReadAll so API errors surface immediately with a descriptive message rather
 // than as a confusing downstream unmarshal or "no responses" failure.
-func readBody(resp *http.Response) ([]byte, error) {
+//
+// It returns an error for ANY non-empty pageError code, including benign ones
+// like WARNING_NOT_LOGGED_IN. A caller that needs to branch on the code itself
+// must unmarshal the body directly rather than calling this.
+func ReadBody(resp *http.Response) ([]byte, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -224,7 +228,7 @@ type LoginResponse struct {
 
 // Login calls the login endpoint and stores user info including timezone data
 func (c *Client) Login() error {
-	fullRequest := buildFullRequest(
+	fullRequest := BuildFullRequest(
 		[]FantraxMessage{{Method: "login", Data: map[string]interface{}{}}},
 		fmt.Sprintf("https://www.fantrax.com/newui/fantasy/miscellaneous.go?leagueId=%s", c.LeagueID),
 	)
@@ -249,7 +253,7 @@ func (c *Client) Login() error {
 		return fmt.Errorf("login API returned non-200 status code: %d", resp.StatusCode)
 	}
 
-	body, err := readBody(resp)
+	body, err := ReadBody(resp)
 	if err != nil {
 		return fmt.Errorf("failed to read login response body: %w", err)
 	}
