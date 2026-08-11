@@ -94,6 +94,22 @@ type TransactionRow struct {
 	Disabled        bool              `json:"disabled,omitempty"`
 	Cells           []TableCell       `json:"cells"`
 	LinkedRows      []interface{}     `json:"linkedRows,omitempty"`
+	// DraftPickDisplayParts is present instead of a populated Scorer when the
+	// row represents a traded draft pick rather than a player. Fantrax gives
+	// pick rows an empty scorer object -- this is the only place the pick's
+	// year and round survive in the payload.
+	DraftPickDisplayParts *DraftPickDisplayParts `json:"draftPickDisplayParts,omitempty"`
+}
+
+// DraftPickDisplayParts identifies a traded draft pick. Both fields carry
+// inline HTML markup from Fantrax's own display rendering (e.g.
+// "<b>2027</b> Draft Pick" / "Round <b>3</b> (Houston Swang and Bang)") and
+// are plain display strings, not structured data -- callers that need the
+// year/round/team as values must parse them (see ParseTransactions, which
+// does this for the simplified Transaction).
+type DraftPickDisplayParts struct {
+	Year      string `json:"year"`
+	RoundInfo string `json:"roundInfo"`
 }
 
 // TransactionPlayer represents player information in a transaction
@@ -157,4 +173,26 @@ type Transaction struct {
 	ExecutedBy     string    `json:"executedBy,omitempty"`     // "COMMISSIONER" if commissioner executed
 	TradeGroupID   string    `json:"tradeGroupId,omitempty"`   // txSetId for grouping trade players
 	TradeGroupSize int       `json:"tradeGroupSize,omitempty"` // numInGroup for trades
+
+	// IsDraftPick and the DraftPick* fields below are populated instead of
+	// PlayerName/PlayerID/PlayerPosition when the row moves a future draft
+	// pick rather than a player -- parsed from the row's
+	// DraftPickDisplayParts. PlayerName stays "" for a pick row, which is
+	// the pre-existing signal callers already key off of.
+	IsDraftPick bool `json:"isDraftPick,omitempty"`
+	// DraftPickYear is the draft the pick belongs to (e.g. 2027).
+	DraftPickYear int `json:"draftPickYear,omitempty"`
+	// DraftPickRound is the round number (1st = 1, 2nd = 2, ...).
+	DraftPickRound int `json:"draftPickRound,omitempty"`
+	// DraftPickNumber is the specific slot within the round (e.g. 6), set
+	// only once the draft order is known. Zero means the slot is still a
+	// projection tied to DraftPickOriginalTeam's eventual standing.
+	DraftPickNumber int `json:"draftPickNumber,omitempty"`
+	// DraftPickOriginalTeam is the team whose future draft slot this is --
+	// distinct from FromTeamName/ToTeamName, which describe this specific
+	// trade's current holder and receiver. A pick can be re-traded before
+	// it is ever drafted, so the original team can differ from both. Empty
+	// once DraftPickNumber is known, since the slot no longer depends on
+	// which team's future record it was.
+	DraftPickOriginalTeam string `json:"draftPickOriginalTeam,omitempty"`
 }

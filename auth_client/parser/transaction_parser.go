@@ -159,7 +159,50 @@ func parseTransactionRow(row models.TransactionRow, userTimezoneOffset string) (
 		tx.TradeGroupSize = row.NumInGroup
 	}
 
+	if row.DraftPickDisplayParts != nil {
+		tx.IsDraftPick = true
+		tx.DraftPickYear = parseLeadingYear(row.DraftPickDisplayParts.Year)
+		tx.DraftPickRound, tx.DraftPickNumber, tx.DraftPickOriginalTeam = parseRoundInfo(row.DraftPickDisplayParts.RoundInfo)
+	}
+
 	return tx, nil
+}
+
+var (
+	yearRe      = regexp.MustCompile(`\d{4}`)
+	roundRe     = regexp.MustCompile(`(?i)round\s+(\d+)`)
+	pickNumRe   = regexp.MustCompile(`(?i)pick\s+(\d+)`)
+	teamParenRe = regexp.MustCompile(`\(([^)]+)\)`)
+)
+
+// parseLeadingYear extracts the four-digit year from a DraftPickDisplayParts
+// "year" string such as "<b>2027</b> Draft Pick".
+func parseLeadingYear(s string) int {
+	plain := stripHTMLTags(s)
+	y, _ := strconv.Atoi(yearRe.FindString(plain))
+	return y
+}
+
+// parseRoundInfo extracts the round, and either a resolved pick number or
+// the pick's original-owner team name, from a DraftPickDisplayParts
+// "roundInfo" string. Fantrax renders this two ways depending on whether the
+// draft order is known yet:
+//   - "Round <b>3</b> (Houston Swang and Bang)" -- still a projection tied
+//     to that team's future standing; round + originalTeam are set.
+//   - "Round <b>1</b> Pick <b>6</b>" -- the slot is resolved; round + number
+//     are set and originalTeam is empty, since the team no longer matters.
+func parseRoundInfo(s string) (round, pickNumber int, originalTeam string) {
+	plain := stripHTMLTags(s)
+	if m := roundRe.FindStringSubmatch(plain); len(m) > 1 {
+		round, _ = strconv.Atoi(m[1])
+	}
+	if m := pickNumRe.FindStringSubmatch(plain); len(m) > 1 {
+		pickNumber, _ = strconv.Atoi(m[1])
+	}
+	if m := teamParenRe.FindStringSubmatch(plain); len(m) > 1 {
+		originalTeam = strings.TrimSpace(m[1])
+	}
+	return round, pickNumber, originalTeam
 }
 
 // parseDateCell extracts the date and execution information from a date cell
