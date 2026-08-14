@@ -146,10 +146,24 @@ func GetCookiesWithBrowser(cacheFile string) ([]*network.Cookie, error) {
 		chromedp.Sleep(5*time.Second),
 	)
 	if err != nil {
-		log.Fatalf("Login error: %v", err)
+		// Returned, never log.Fatalf. This is a library on a request path, and
+		// os.Exit here kills the caller's process before it can record anything.
+		//
+		// The case that matters is a login CHALLENGE: a Cloudflare interstitial
+		// or a 2FA prompt means the login form never renders, so the
+		// WaitVisible calls above time out and land here. A caller that
+		// classifies login outcomes (rosterbot's connect task records a named
+		// failure class and exits 0, so a user-fixable problem does not page an
+		// operator) got a dead process instead of a diagnosis — the one
+		// scenario worth detecting was the one that could not be reported.
+		return nil, fmt.Errorf("fantrax login: %w", err)
 	}
 
-	fmt.Println("Login successful. Getting auth_client...")
+	// NOTE: this reports that the browser script finished, NOT that Fantrax
+	// accepted the credentials — nothing above checks that. A rejected password
+	// reaches this line too, and is distinguishable only later, by the absence
+	// of an FX_RM cookie.
+	fmt.Println("Login flow completed. Getting auth_client...")
 
 	err = chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 		// Get cookies from Chrome
