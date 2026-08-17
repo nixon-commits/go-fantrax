@@ -85,12 +85,31 @@ func getCookiesFromCache(cacheFile string) ([]*network.Cookie, error) {
 	return cookies, nil
 }
 
+// GetCookiesWithBrowser drives a headless login and returns the resulting
+// cookies. It is the compatibility shim over LoginWithBrowser for callers that
+// only need the cookies and do not classify failures.
 func GetCookiesWithBrowser(cacheFile string) ([]*network.Cookie, error) {
+	cookies, _, err := LoginWithBrowser(cacheFile, DefaultLoginProbes)
+	return cookies, err
+}
+
+// LoginWithBrowser drives a headless login and returns the resulting cookies
+// alongside evidence about what the page looked like afterwards.
+//
+// The outcome is returned on BOTH paths, including when err is non-nil, and
+// that is the whole point of the function. The failure this most needs to
+// describe is a login challenge — a Cloudflare interstitial or a 2FA prompt —
+// and in that case the login form never renders, so the WaitVisible calls below
+// time out and the script returns an error. Collecting evidence only on success
+// would leave every interesting failure indistinguishable from a network blip.
+//
+// A nil outcome means the browser could not be reached at all.
+func LoginWithBrowser(cacheFile string, probes []LoginProbe) ([]*network.Cookie, *LoginOutcome, error) {
 	// Get credentials from environment variables or command line
 	username := os.Getenv("FANTRAX_USERNAME")
 	password := os.Getenv("FANTRAX_PASSWORD")
 	if username == "" || password == "" {
-		return nil, errors.New("unable to fetch cookies from Fantrax." +
+		return nil, nil, errors.New("unable to fetch cookies from Fantrax." +
 			"FANTRAX_USERNAME and FANTRAX_PASSWORD must be set as environment variables")
 	}
 
@@ -108,12 +127,19 @@ func GetCookiesWithBrowser(cacheFile string) ([]*network.Cookie, error) {
 	defer cancel()
 
 	// Create a new browser context with logging
-	ctx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	browserCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
 	defer cancel()
 
-	// Set a timeout for the entire operation
-	ctx, cancel = context.WithTimeout(ctx, 60*time.Second)
+	// The browser outlives the login script deliberately. The script gets its
+	// own deadline below; if it blows that deadline the browser is still usable,
+	// which is what lets the evidence pass run afterwards. Deriving the login
+	// timeout from the only context there is — the previous shape here — meant a
+	// timed-out login left nothing able to ask the page why.
+	browserCtx, cancel = context.WithTimeout(browserCtx, 120*time.Second)
 	defer cancel()
+
+	ctx, cancelLogin := context.WithTimeout(browserCtx, 60*time.Second)
+	defer cancelLogin()
 
 	fmt.Println("Navigating to Fantrax login page...")
 	// Get the cookies after login
@@ -145,7 +171,8 @@ func GetCookiesWithBrowser(cacheFile string) ([]*network.Cookie, error) {
 		// Wait for login to complete (could be navigation or a specific element)
 		chromedp.Sleep(5*time.Second),
 	)
-	if err != nil {
+	loginErr := err
+	if loginErr != nil {
 		// Returned, never log.Fatalf. This is a library on a request path, and
 		// os.Exit here kills the caller's process before it can record anything.
 		//
@@ -156,41 +183,102 @@ func GetCookiesWithBrowser(cacheFile string) ([]*network.Cookie, error) {
 		// failure class and exits 0, so a user-fixable problem does not page an
 		// operator) got a dead process instead of a diagnosis — the one
 		// scenario worth detecting was the one that could not be reported.
-		return nil, fmt.Errorf("fantrax login: %w", err)
+		//
+		// Deliberately NOT an early return: the evidence pass below is the only
+		// thing that can say WHICH challenge this was, and it is precisely the
+		// error path that needs the answer.
+		loginErr = fmt.Errorf("fantrax login: %w", loginErr)
+	} else {
+		// NOTE: this reports that the browser script finished, NOT that Fantrax
+		// accepted the credentials — nothing above checks that. A rejected
+		// password reaches this line too, and is told apart from a success only
+		// by the evidence gathered below plus the absence of an FX_RM cookie.
+		fmt.Println("Login flow completed. Getting auth_client...")
 	}
 
-	// NOTE: this reports that the browser script finished, NOT that Fantrax
-	// accepted the credentials — nothing above checks that. A rejected password
-	// reaches this line too, and is distinguishable only later, by the absence
-	// of an FX_RM cookie.
-	fmt.Println("Login flow completed. Getting auth_client...")
+	outcome := collectLoginEvidence(browserCtx, probes)
 
-	err = chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+	if loginErr != nil {
+		return nil, outcome, loginErr
+	}
+
+	if err := chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 		// Get cookies from Chrome
-		chromeCookies, err = storage.GetCookies().Do(ctx)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}))
+		var cerr error
+		chromeCookies, cerr = storage.GetCookies().Do(ctx)
+		return cerr
+	})); err != nil {
+		// Previously this error was assigned to `err` and then immediately
+		// overwritten by the os.Create below, so a failed cookie read fell
+		// through and cached a literal "null". The caller then saw an empty
+		// cookie set and no error — the same undiagnosable shape this function
+		// exists to stop producing.
+		return nil, outcome, fmt.Errorf("fantrax login: read cookies: %w", err)
+	}
 
 	// Write our cookies to cache
 	f, err := os.Create(cacheFile)
 	if err != nil {
-		return nil, err
+		return nil, outcome, err
 	}
 	defer f.Close()
 
 	cookieBytes, err := json.Marshal(chromeCookies)
 	if err != nil {
-		return nil, err
+		return nil, outcome, err
 	}
 
 	_, err = f.Write(cookieBytes)
 	if err != nil {
-		return nil, err
+		return nil, outcome, err
 	}
 
-	return chromeCookies, nil
+	return chromeCookies, outcome, nil
+}
+
+// collectLoginEvidence reads the post-submit page state.
+//
+// It never fails the login: evidence is a diagnostic, and a caller that already
+// has cookies must not be told the login broke because a probe could not run.
+// A nil return means the page could not be read at all, which is itself
+// reported honestly rather than as an empty (and therefore misleading) outcome.
+func collectLoginEvidence(browserCtx context.Context, probes []LoginProbe) *LoginOutcome {
+	if len(probes) == 0 {
+		probes = DefaultLoginProbes
+	}
+	js, err := loginEvidenceJS(probes)
+	if err != nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(browserCtx, 15*time.Second)
+	defer cancel()
+
+	var raw map[string]any
+	if err := chromedp.Run(ctx, chromedp.Evaluate(js, &raw)); err != nil {
+		return nil
+	}
+
+	out := &LoginOutcome{Texts: map[string]string{}, Raw: raw}
+	if s, ok := raw["url"].(string); ok {
+		out.FinalURL = s
+	}
+	if s, ok := raw["title"].(string); ok {
+		out.Title = s
+	}
+	if m, ok := raw["matched"].([]any); ok {
+		for _, v := range m {
+			if s, ok := v.(string); ok {
+				out.Matched = append(out.Matched, s)
+			}
+		}
+	}
+	if t, ok := raw["texts"].(map[string]any); ok {
+		for k, v := range t {
+			if s, ok := v.(string); ok {
+				out.Texts[k] = s
+			}
+		}
+	}
+	return out
 }
